@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+
+    <style name="Theme.IdeaJar" parent="android:Theme.Material.Light.NoActionBar" />
+
+    <style name="Theme.IdeaJar.Translucent" parent="Theme.IdeaJar">
+        <item name="android:windowIsTranslucent">true</item>
+        <item name="android:windowBackground">@android:color/transparent</item>
+        <item name="android:windowContentOverlay">@null</item>
+        <item name="android:windowNoTitle">true</item>
+        <item name="android:backgroundDimEnabled">true</item>
+    </style>
+
+    <style name="Theme.IdeaJar.Dialog" parent="ThemeOverlay.Material3.MaterialCalendar">
+        <item name="colorSurface">@android:color/black</item>
+        <item name="colorOnSurface">@android:color/white</item>
+        <item name="colorPrimary">#B026FF</item> <!-- Neon Purple -->
+        <item name="colorOnPrimary">@android:color/white</item>
+    </style>
+</resources>
