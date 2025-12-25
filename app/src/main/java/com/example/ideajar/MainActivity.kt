@@ -148,11 +148,18 @@ class MainActivity : ComponentActivity() {
                         }
                     ) { innerPadding ->
                         androidx.compose.foundation.layout.Box(modifier = Modifier.padding(innerPadding)) {
-                             if (showStarfield) {
+                            if (showStarfield) {
                                 StarfieldView(
                                     notes = notesState.value, 
                                     categories = categoriesState.value,
-                                    onNoteClick = { note -> selectedNote = note }
+                                    onNoteClick = { note -> selectedNote = note },
+                                    onHomeClick = { showStarfield = false },
+                                    onCategoryMove = { updatedCategory ->
+                                        scope.launch {
+                                            noteDao.updateCategory(updatedCategory)
+                                        }
+                                    },
+                                    searchQuery = searchQuery
                                 )
                             } else {
                                 NoteListScreen(
@@ -266,20 +273,21 @@ fun NoteListScreen(
     onDelete: (Note) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val filteredNotes = notes.filter { 
-        it.note.title.contains(searchQuery, ignoreCase = true) || 
-        it.note.content.contains(searchQuery, ignoreCase = true)
+    // Optimized Filtering & Grouping
+    val filteredNotes = remember(notes, searchQuery) {
+        notes.filter { 
+            it.note.title.contains(searchQuery, ignoreCase = true) || 
+            it.note.content.contains(searchQuery, ignoreCase = true)
+        }
     }
 
-    // Grouping Logic:
-    // 1. Critical (Has Deadline)
-    // 2. Categorized
-    // 3. Drifting (No Category, No Deadline)
-    
-    val criticalNotes = filteredNotes.filter { it.note.deadline != null }.sortedBy { it.note.deadline }
-    val remainingNotes = filteredNotes.filter { it.note.deadline == null }
-    val categorizedNotes = remainingNotes.filter { it.category != null }.groupBy { it.category!!.name }
-    val driftingNotes = remainingNotes.filter { it.category == null }
+    val (criticalNotes, categorizedNotes, driftingNotes) = remember(filteredNotes) {
+        val critical = filteredNotes.filter { it.note.deadline != null }.sortedBy { it.note.deadline }
+        val remaining = filteredNotes.filter { it.note.deadline == null }
+        val categorized = remaining.filter { it.category != null }.groupBy { it.category!!.name }
+        val drifting = remaining.filter { it.category == null }
+        Triple(critical, categorized, drifting)
+    }
 
     Column(modifier = modifier.fillMaxSize()) {
         // Search Bar

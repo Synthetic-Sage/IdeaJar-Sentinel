@@ -11,11 +11,14 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.detectTransformGestures
+import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CenterFocusStrong
+import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
@@ -44,8 +47,14 @@ import kotlin.random.Random
 fun StarfieldView(
     notes: List<NoteWithCategory>,
     categories: List<Category>,
-    onNoteClick: (Note) -> Unit
+    onNoteClick: (Note) -> Unit,
+    onHomeClick: () -> Unit,
+    onCategoryMove: (Category) -> Unit,
+    searchQuery: String = ""
 ) {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val prefs = remember { context.getSharedPreferences("ideajar_prefs", android.content.Context.MODE_PRIVATE) }
+    var showCoachMarks by remember { androidx.compose.runtime.mutableStateOf(prefs.getBoolean("show_starfield_coach_marks", true)) }
     // Animation Master Time
     val infiniteTransition = rememberInfiniteTransition(label = "StarfieldAnimations")
     
@@ -97,14 +106,85 @@ fun StarfieldView(
         }
     }
 
+    // Local state for dragging categories smoothly
+    var draggingCategoryId by remember { androidx.compose.runtime.mutableStateOf<Long?>(null) }
+    val dragOverrides = remember { androidx.compose.runtime.mutableStateMapOf<Long, Offset>() }
+
     Box(modifier = Modifier.fillMaxSize().background(Color.Black)) {
         Canvas(
             modifier = Modifier
                 .fillMaxSize()
                 .pointerInput(Unit) {
                     detectTransformGestures { _: Offset, pan: Offset, _: Float, _: Float ->
-                        cameraOffset += pan
+                        // Feature: Faster Pan (1.5x)
+                        cameraOffset += pan * 1.5f
                     }
+                }
+                .pointerInput(categories, cameraOffset) {
+                     detectDragGesturesAfterLongPress(
+                        onDragStart = { startOffset ->
+                            val width = size.width.toFloat()
+                            val height = size.height.toFloat()
+                            // Hit Test for Categories
+                             for (category in categories) {
+                                val currentPos = dragOverrides[category.id] ?: Offset(category.xPos, category.yPos)
+                                val centerX = currentPos.x * width + cameraOffset.x
+                                val centerY = currentPos.y * height + cameraOffset.y
+                                val holeRadius = 60.dp.toPx() // Base radius approx
+                                
+                                val dx = startOffset.x - centerX
+                                val dy = startOffset.y - centerY
+                                if (dx*dx + dy*dy < holeRadius*holeRadius * 4) { // generous hit area
+                                    draggingCategoryId = category.id
+                                    return@detectDragGesturesAfterLongPress
+                                }
+                            }
+                        },
+                        onDrag = { change, dragAmount ->
+                            val catId = draggingCategoryId
+                            if (catId != null) {
+                                change.consume()
+                                val width = size.width.toFloat()
+                                val height = size.height.toFloat()
+                                
+                                // Calculate new relative position
+                                // We need to convert dragAmount (pixels) to relative coordinates based on screen size
+                                // But simpler is to update the override Offset in RELATIVE coords? 
+                                // No, dragOverrides stores Relative coords (0-1) to match Category struct?
+                                // Let's check logic below: centerX = category.xPos * width...
+                                // So we need to store 0-1.
+                                
+                                val currentCategory = categories.find { it.id == catId } ?: return@detectDragGesturesAfterLongPress
+                                val currentRelative = dragOverrides[catId] ?: Offset(currentCategory.xPos, currentCategory.yPos)
+                                
+                                val dxRel = dragAmount.x / width
+                                val dyRel = dragAmount.y / height
+                                
+                                dragOverrides[catId] = Offset(
+                                    (currentRelative.x + dxRel).coerceIn(0f, 1f),
+                                    (currentRelative.y + dyRel).coerceIn(0f, 1f)
+                                )
+                            }
+                        },
+                        onDragEnd = {
+                             val catId = draggingCategoryId
+                             if (catId != null) {
+                                  val category = categories.find { it.id == catId }
+                                  val override = dragOverrides[catId]
+                                  if (category != null && override != null) {
+                                      // Commit change
+                                      onCategoryMove(category.copy(xPos = override.x, yPos = override.y))
+                                  }
+                                  // Cleanup
+                                  draggingCategoryId = null
+                                  dragOverrides.remove(catId)
+                             }
+                        },
+                        onDragCancel = {
+                            draggingCategoryId = null
+                            dragOverrides.clear() 
+                        }
+                     )
                 }
                 .pointerInput(notes, categories, cameraOffset) {
                     detectTapGestures { tapOffset ->
@@ -115,8 +195,12 @@ fun StarfieldView(
                         // Hit Test (Reverse order)
                         for (item in notes.reversed()) {
                              val cat = item.category
-                             val centerX = (cat?.xPos ?: 0.5f) * width + cameraOffset.x
-                             val centerY = (cat?.yPos ?: 0.5f) * height + cameraOffset.y
+                             // Use override if available
+                             val catId = cat?.id
+                             val catPos = if (catId != null) dragOverrides[catId] ?: Offset(cat.xPos, cat.yPos) else Offset(0.5f, 0.5f)
+                             
+                             val centerX = catPos.x * width + cameraOffset.x
+                             val centerY = catPos.y * height + cameraOffset.y
                              
                              val seed = item.note.id.hashCode()
                              val random = Random(seed)
@@ -158,9 +242,14 @@ fun StarfieldView(
             }
 
             // 2. Draw Event Horizon (Black Holes)
+            // 2. Draw Event Horizon (Black Holes)
             categories.forEach { category ->
-                val centerX = category.xPos * width + cameraOffset.x
-                val centerY = category.yPos * height + cameraOffset.y
+                val override = dragOverrides[category.id]
+                val safeX = override?.x ?: category.xPos
+                val safeY = override?.y ?: category.yPos
+                
+                val centerX = safeX * width + cameraOffset.x
+                val centerY = safeY * height + cameraOffset.y
                 val baseColor = Color(category.colorHex.toInt())
 
                 val holeRadius = 60.dp.toPx() * pulseScale
@@ -236,9 +325,23 @@ fun StarfieldView(
             // 3. Draw Notes as Planets
             notes.forEach { item ->
                 val cat = item.category
-                val centerX = (cat?.xPos ?: 0.5f) * width + cameraOffset.x
-                val centerY = (cat?.yPos ?: 0.5f) * height + cameraOffset.y
-                val themeColor = if (cat != null) Color(cat.colorHex.toInt()) else Color.White
+                
+                // Determine Matching Status (Feature: Search Highlighting)
+                val matchesSearch = searchQuery.isEmpty() || 
+                    item.note.title.contains(searchQuery, ignoreCase = true) || 
+                    item.note.content.contains(searchQuery, ignoreCase = true)
+                
+                // Dim non-matches
+                val alphaMult = if (matchesSearch) 1f else 0.1f
+                
+                val catId = cat?.id
+                // Use override if available
+                val catPos = if (catId != null) dragOverrides[catId] ?: Offset(cat.xPos, cat.yPos) else Offset(0.5f, 0.5f)
+                val centerX = catPos.x * width + cameraOffset.x
+                val centerY = catPos.y * height + cameraOffset.y
+                
+                // Neon Mode: Default to Cyan if no category
+                val themeColor = if (cat != null) Color(cat.colorHex.toInt()) else Color(0xFF03DAC5)
 
                 val seed = item.note.id.hashCode()
                 val random = Random(seed)
@@ -247,14 +350,13 @@ fun StarfieldView(
                 val orbitRadius = random.nextFloat() * 100.dp.toPx() + 80.dp.toPx()
 
                 // --- Trails (History) ---
-                // Draw faint "ghosts" behind the planet
                 for (i in 1..3) {
-                    val trailAngle = currentAngle - Math.toRadians(i * 3.0) // 3 degree lag
+                    val trailAngle = currentAngle - Math.toRadians(i * 3.0) 
                     val trailX = centerX + (orbitRadius * cos(trailAngle)).toFloat()
                     val trailY = centerY + (orbitRadius * sin(trailAngle)).toFloat()
                     drawCircle(
-                        color = themeColor.copy(alpha = 0.4f / i),
-                        radius = (6 - i).dp.toPx(), // shrinking
+                        color = themeColor.copy(alpha = (0.4f / i) * alphaMult),
+                        radius = (6 - i).dp.toPx(),
                         center = Offset(trailX, trailY)
                     )
                 }
@@ -262,25 +364,34 @@ fun StarfieldView(
                 // --- The Planet ---
                 val planetX = centerX + (orbitRadius * cos(currentAngle)).toFloat()
                 val planetY = centerY + (orbitRadius * sin(currentAngle)).toFloat()
-                val planetRadius = 10.dp.toPx()
+                val planetRadius = 12.dp.toPx() // Increased slightly
 
                 // Glow
                 drawCircle(
-                    color = themeColor.copy(alpha = 0.3f),
-                    radius = planetRadius * 1.5f,
+                    color = themeColor.copy(alpha = 0.3f * alphaMult),
+                    radius = planetRadius * 1.8f,
                     center = Offset(planetX, planetY)
                 )
                 // Core
                 drawCircle(
-                    color = themeColor,
+                    color = themeColor.copy(alpha = 1f * alphaMult),
                     radius = planetRadius,
                     center = Offset(planetX, planetY)
                 )
-                // Shadow (Simulate lighting from Black Hole?)
-                // Actually, let's just make it look 3D by adding a shadow crescent on the side away from the black hole is hard
-                // Simple 3D top-left light source for now
+                
+                // White Border for Pop (Neon Mode)
+                if (cat == null) {
+                    drawCircle(
+                        color = Color.White.copy(alpha = 0.8f * alphaMult),
+                        radius = planetRadius,
+                        center = Offset(planetX, planetY),
+                        style = Stroke(width = 1.dp.toPx())
+                    )
+                }
+
+                // Shadow
                 drawCircle(
-                    color = Color.Black.copy(alpha = 0.3f),
+                    color = Color.Black.copy(alpha = 0.3f * alphaMult),
                     radius = planetRadius * 0.8f,
                     center = Offset(planetX + 2f, planetY + 2f)
                 )
@@ -289,36 +400,52 @@ fun StarfieldView(
                 if (item.note.deadline != null) {
                     drawCircle(
                         color = com.example.ideajar.ui.theme.NeonRed,
-                        radius = planetRadius * 1.8f,
+                        radius = planetRadius * 2.0f,
                         center = Offset(planetX, planetY),
                         style = Stroke(width = 1.5.dp.toPx())
                     )
                 }
 
                 // --- Label LOD ---
-                // Only draw text if count <= 20 OR note is Critical (has deadline aka red ring)
-                // Note: 'notes' is the list.
-                val shouldDrawLabel = notes.size <= 20 || item.note.deadline != null
+                val shouldDrawLabel = (searchQuery.isNotEmpty() && matchesSearch) || 
+                                     (searchQuery.isEmpty() && (notes.size <= 25 || item.note.deadline != null))
 
                 if (shouldDrawLabel) {
                     val sourceText = item.note.title.ifBlank { item.note.content }
-                    val labelText = sourceText.take(12)
-                    val finalLabel = if (labelText.length < sourceText.length) "$labelText.." else labelText
+                    
+                    // Text Wrapping Logic
+                    val lines = if (sourceText.length > 15) {
+                        val splitIndex = sourceText.indexOf(' ', 10).takeIf { it != -1 && it < 20 } ?: 15.coerceAtMost(sourceText.length)
+                        if (splitIndex < sourceText.length) {
+                             listOf(sourceText.substring(0, splitIndex), sourceText.substring(splitIndex).trim())
+                        } else {
+                             listOf(sourceText)
+                        }
+                    } else {
+                        listOf(sourceText)
+                    }
 
                     drawContext.canvas.nativeCanvas.apply {
                         val textPaint = android.graphics.Paint().apply {
                             this.color = StarWhite.toArgb()
-                            this.textSize = 42f // ~14sp
+                            this.alpha = (255 * alphaMult).toInt()
+                            this.textSize = 34f // Smaller (~11sp)
                             this.typeface = android.graphics.Typeface.create(android.graphics.Typeface.DEFAULT, android.graphics.Typeface.BOLD)
-                            // Black outline/shadow for readability
-                            setShadowLayer(12f, 0f, 0f, android.graphics.Color.BLACK)
+                            setShadowLayer(8f, 0f, 0f, android.graphics.Color.BLACK)
+                            this.textAlign = android.graphics.Paint.Align.LEFT
                         }
-                        drawText(
-                            finalLabel,
-                            planetX + 30f,
-                            planetY + 12f,
-                            textPaint
-                        )
+                        
+                        // Draw lines
+                        lines.forEachIndexed { index, line ->
+                            // Truncate if still too long
+                            val safeLine = if (line.length > 15 && index > 0) line.take(12) + ".." else line
+                            drawText(
+                                safeLine,
+                                planetX + 35f,
+                                planetY + 8f + (index * 40f), // Line height spacing
+                                textPaint
+                            )
+                        }
                     }
                 }
             }
@@ -328,15 +455,90 @@ fun StarfieldView(
         androidx.compose.material3.IconButton(
             onClick = { cameraOffset = Offset.Zero },
             modifier = Modifier
-                .align(androidx.compose.ui.Alignment.BottomStart)
+                .align(androidx.compose.ui.Alignment.TopEnd) // Moved to TopRight
+                .padding(top = 16.dp, end = 16.dp) // Adjusted padding
+                .background(Color.Black.copy(alpha = 0.6f), androidx.compose.foundation.shape.CircleShape)
+        ) {
+            androidx.compose.material3.Icon(
+                imageVector = Icons.Default.Refresh,
+                contentDescription = "Recenter",
+                tint = com.example.ideajar.ui.theme.NeonBlue
+            )
+        }
+
+        // Home Button
+        androidx.compose.material3.IconButton(
+            onClick = onHomeClick,
+            modifier = Modifier
+                .align(androidx.compose.ui.Alignment.TopStart)
                 .padding(16.dp)
                 .background(Color.Black.copy(alpha = 0.5f), androidx.compose.foundation.shape.CircleShape)
         ) {
             androidx.compose.material3.Icon(
-                imageVector = Icons.Default.CenterFocusStrong,
-                contentDescription = "Recenter",
-                tint = com.example.ideajar.ui.theme.NeonBlue
+                imageVector = androidx.compose.material.icons.Icons.Default.ArrowBack,
+                contentDescription = "Exit / Home",
+                tint = Color.White
             )
+        }
+
+        // Coach Marks Overlay
+        if (showCoachMarks) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(Color.Black.copy(alpha = 0.8f))
+                    .pointerInput(Unit) {
+                        detectTapGestures {
+                            showCoachMarks = false
+                            prefs.edit().putBoolean("show_starfield_coach_marks", false).apply()
+                        }
+                    }
+            ) {
+                // Hint for Home Button
+                androidx.compose.material3.Text(
+                    text = "↖ Exit to List",
+                    color = Color.White,
+                    modifier = Modifier
+                        .align(androidx.compose.ui.Alignment.TopStart)
+                        .padding(start = 64.dp, top = 28.dp),
+                    style = androidx.compose.material3.MaterialTheme.typography.titleMedium
+                )
+                
+                // Hint for Refresh Button
+                androidx.compose.material3.Text(
+                    text = "Recalibrate View ↘",
+                    color = com.example.ideajar.ui.theme.NeonBlue,
+                    modifier = Modifier
+                        .align(androidx.compose.ui.Alignment.BottomEnd)
+                        .padding(end = 64.dp, bottom = 28.dp),
+                     style = androidx.compose.material3.MaterialTheme.typography.titleMedium
+                )
+
+                // Center Text
+                androidx.compose.foundation.layout.Column(
+                    modifier = Modifier.align(androidx.compose.ui.Alignment.Center),
+                    horizontalAlignment = androidx.compose.ui.Alignment.CenterHorizontally
+                ) {
+                    androidx.compose.material3.Text(
+                        text = "The Void",
+                        style = androidx.compose.material3.MaterialTheme.typography.displayMedium,
+                        color = Color.White,
+                        fontWeight = FontWeight.Bold
+                    )
+                    androidx.compose.foundation.layout.Spacer(modifier = Modifier.padding(8.dp))
+                    androidx.compose.material3.Text(
+                        text = "• Drag to explore\n• Tap stars to open\n• Shake to spawn ideas",
+                        style = androidx.compose.material3.MaterialTheme.typography.bodyLarge,
+                        color = Color.LightGray
+                    )
+                    androidx.compose.foundation.layout.Spacer(modifier = Modifier.padding(16.dp))
+                    androidx.compose.material3.Text(
+                        text = "(Tap anywhere to start)",
+                        style = androidx.compose.material3.MaterialTheme.typography.labelMedium,
+                        color = Color.Gray
+                    )
+                }
+            }
         }
     }
 }

@@ -1,38 +1,61 @@
-# IdeaJar: The Silent Sentinel 🌌
+# 🌌 IdeaJar: The Gravity-Based Note Archive
 
-> **"Don't just list ideas. Let them orbit."**
+> *"Order from Chaos."*
 
-**IdeaJar** is an offline-first, sci-fi themed quick capture tool designed to live in your notification shade. It solves the friction of traditional note-taking by letting you capture thoughts instantly via a lightweight overlay—without ever leaving your current app.
+**IdeaJar** is not a normal to-do list. It is an offline-first, physics-based memory vault designed for "Lone Wolf" thinkers. Notes are not static text rows; they are physical entities that orbit, drift, and collide in a simulated zero-gravity environment.
 
-## 🚀 Key Features
+### 🚀 Latest Release: v1.2 "Event Horizon"
+* **Android 15 Ready:** Full support for `FOREGROUND_SERVICE_SPECIAL_USE`.
+* **Mission Control:** Backup and Restore your entire universe (JSON Export).
+* **Neon Visuals:** High-contrast HUD for deep space visibility.
 
-* **👻 The Silent Sentinel:** A persistent notification that launches a lightweight overlay. Capture ideas over Instagram, YouTube, or any other app without context switching.
-* **🌌 Gravity Wells:** Ditch boring lists. Your ideas are organized as "Solar Systems" with color-coded orbits.
-* **⚡ Instant Capture:** Zero lag. Type, save, and watch your idea drift into the void.
-* **🔒 Data Sovereignty:** 100% Offline. Your data lives on your device. Export your entire universe to JSON at any time.
-* **🔋 Zero Drain:** Engineered for efficiency. No background sensors or wakelocks.
+---
 
-## ⚠️ Installation & Troubleshooting
+## ⚡ Core Features
 
-Because this app is new and not yet on the Play Store, **Google Play Protect may block the installation** by default.
+### ⚛️ Physics Simulation
+* **Zero-G Environment:** Notes float and react to simulated gravity.
+* **Black Hole Categorization:** Drag notes into massive "Category Stars" to organize them.
+* **Interactive Chaos:** Fling, drag, and collide thoughts to spark new ideas.
 
-### **How to Install (The "Airplane Mode" Trick)**
-If the installer rejects the APK immediately without an "Install Anyway" option, follow these steps:
+### 🛡️ The Sentinel Overlay (Foreground Service)
+* **Always Ready:** A persistent "Shake Detection" service runs in the background.
+* **Quick Capture:** Shake your phone anytime to spawn a Quick Note without opening the app.
+* **Offline First:** No cloud, no ads, no tracking. Your data stays on your device.
 
-1.  **Turn OFF** Wi-Fi and Mobile Data (Enable Airplane Mode). ✈️
-2.  Open the APK and click **Install**.
-3.  Once installed, turn your internet back on.
-4.  Launch the app and grant the **"Display Over Other Apps"** permission when prompted (Required for the Sentinel Overlay).
+### 🔧 Mission Control (Settings)
+* **Data Sovereignty:** Export your database to JSON. Restore it on any device.
+* **Privacy:** Built-in "Incognito Mode" (App does not use Internet permissions except for local loopback).
 
-## 🛠️ Tech Stack
+---
 
-* **Language:** Kotlin
-* **UI:** Jetpack Compose (Modern, Reactive UI)
-* **Database:** Room (Local SQLite)
-* **Architecture:** MVVM with Foreground Services
+## 🛠️ Technical Stack
 
-## 🐛 Feedback & Bugs
+* **Language:** Kotlin (100%)
+* **UI Framework:** Jetpack Compose (Modern Reactive UI)
+* **Architecture:** MVVM (Model-View-ViewModel)
+* **Database:** Room (SQLite) with Coroutines
+* **Physics Engine:** Custom 2D Vector Physics (Velocity, Friction, Collision)
+* **Background:** Android Foreground Services (`dataSync` / `specialUse`)
 
-Found a glitch in the Matrix?
-* Go to **Settings > About > Report Anomaly** inside the app.
-* Or open an Issue directly here on GitHub.
+---
+
+## 📥 Installation (Side-Load)
+
+Since this app is a "Rogue Tool" (not on Play Store), you must install it manually.
+
+1.  Download the latest `.apk` from the **[Releases]** tab.
+2.  **Android 14/15 Users:** If "Play Protect" blocks the install:
+    * *Option A:* Turn on **Airplane Mode** ✈️ before installing.
+    * *Option B:* Click "More Details" -> "Install Anyway."
+3.  **Permissions:** Grant "Display Over Other Apps" when prompted (required for the Quick Capture overlay).
+
+---
+
+## 👨‍💻 Developer Log
+Maintained by **Synthetic Sage**.
+* **v1.0:** Initial Launch (The Silent Sentinel).
+* **v1.1:** Stability Patch (Crash Fixes).
+* **v1.2:** Event Horizon (Data Backup & A15 Support).
+
+[Read Full Development Report](DEV_REPORT.md)

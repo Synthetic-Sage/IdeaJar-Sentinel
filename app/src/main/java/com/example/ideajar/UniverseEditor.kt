@@ -166,10 +166,7 @@ fun UniverseEditor(
                             uri?.let {
                                 scope.launch {
                                     try {
-                                        val json = repository.exportToJson()
-                                        context.contentResolver.openOutputStream(it)?.use { outputStream ->
-                                            outputStream.write(json.toByteArray())
-                                        }
+                                        com.example.ideajar.utils.BackupUtils.createBackup(context, it)
                                         SoundManager.playWhooshSound()
                                         android.widget.Toast.makeText(context, "Universe Validated & Archived to File", android.widget.Toast.LENGTH_LONG).show()
                                     } catch (e: Exception) {
@@ -181,18 +178,21 @@ fun UniverseEditor(
 
                         val loadLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
                             uri?.let {
+                            uri?.let {
                                 scope.launch {
                                     try {
-                                        context.contentResolver.openInputStream(it)?.use { inputStream ->
-                                            val json = inputStream.bufferedReader().use { reader -> reader.readText() }
-                                            repository.importFromJson(json)
+                                        val success = com.example.ideajar.utils.BackupUtils.restoreBackup(context, it)
+                                        if (success) {
                                             SoundManager.playWhooshSound()
                                             android.widget.Toast.makeText(context, "Universe Restored from Archives", android.widget.Toast.LENGTH_LONG).show()
+                                        } else {
+                                            android.widget.Toast.makeText(context, "Restoration Failed", android.widget.Toast.LENGTH_LONG).show()
                                         }
                                     } catch (e: Exception) {
                                         android.widget.Toast.makeText(context, "Restoration Failed: ${e.message}", android.widget.Toast.LENGTH_LONG).show()
                                     }
                                 }
+                            }
                             }
                         }
 

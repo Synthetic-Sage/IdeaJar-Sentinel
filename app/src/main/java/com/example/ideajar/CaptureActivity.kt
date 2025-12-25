@@ -32,6 +32,7 @@ import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Star
 import com.example.ideajar.ui.theme.IdeaJarTheme
 import com.example.ideajar.ui.theme.NeonBlue
 import com.example.ideajar.ui.theme.NeonPurple
@@ -146,16 +147,46 @@ fun CaptureScreen(activity: android.app.Activity) {
                     letterSpacing = 2.sp
                 )
                 
-                // Cancel Button (Top Right)
-                IconButton(
-                     onClick = { activity.finish() },
-                     modifier = Modifier.align(Alignment.End).offset(y = (-40).dp)
+                // Top Actions Row
+                Row(
+                    modifier = Modifier
+                        .align(Alignment.End)
+                        .offset(y = (-40).dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    Icon(
-                        imageVector = androidx.compose.material.icons.Icons.Default.Close,
-                        contentDescription = "Cancel",
-                        tint = Color.Gray
-                    )
+                    // Creative Spark Button
+                    IconButton(
+                        onClick = {
+                            val prompts = listOf(
+                                "What if gravity reversed? 🌌",
+                                "Explain it to a 5-year-old 👶", 
+                                "Design a tool for... 🛠️",
+                                "Write a poem about... 🖋️",
+                                "Pros and Cons of... ⚖️",
+                                "A day in the life of... 📅",
+                                "The secret history of... 🕵️‍♀️"
+                            )
+                            val prompt = prompts.random()
+                            val currentText = content.text
+                            val newText = if (currentText.isBlank()) prompt else "$currentText\n$prompt"
+                            content = TextFieldValue(newText, TextRange(newText.length))
+                        }
+                    ) {
+                        Icon(
+                            imageVector = androidx.compose.material.icons.Icons.Default.Star,
+                            contentDescription = "Creative Spark",
+                            tint = com.example.ideajar.ui.theme.NeonBlue
+                        )
+                    }
+
+                    // Cancel Button
+                    IconButton(onClick = { activity.finish() }) {
+                        Icon(
+                            imageVector = androidx.compose.material.icons.Icons.Default.Close,
+                            contentDescription = "Cancel",
+                            tint = Color.Gray
+                        )
+                    }
                 }
                 
                 // Headline Input

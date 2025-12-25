@@ -6,6 +6,7 @@
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
     <uses-permission android:name="android.permission.USE_EXACT_ALARM" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
 
     <application
         android:name=".IdeaJarApp"
@@ -36,7 +37,13 @@
             android:windowSoftInputMode="stateVisible|adjustResize"
             android:exported="false" />
         <receiver android:name=".DeadlineReceiver" />
-        <service android:name=".ShakeService" />
+        <service
+            android:name=".ShakeService"
+            android:foregroundServiceType="specialUse">
+            <property
+                android:name="android.app.property.FOREGROUND_SERVICE_TYPE_SPECIAL_USE_DESCRIPTION"
+                android:value="Floating overlay for quick note capture" />
+        </service>
     </application>
 
 </manifest>
